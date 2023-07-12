@@ -10,7 +10,7 @@ bool p_placed = 0; // flag for player
 int r_placed = 0; // flag for room
 int p_gold = 0; // player gold
 
-int dungeon (int c, int rows, int cols, char (* map)[cols]) // char (* map)[cols]) - two-dimensional array ...
+int game_loop(int c, int rows, int cols, char (* map)[cols]) // char (* map)[cols]) - two-dimensional array ...
 {	
 	srand(time(NULL));
 	
@@ -18,8 +18,11 @@ int dungeon (int c, int rows, int cols, char (* map)[cols]) // char (* map)[cols
 	{
 		int ry, rx; // room coords
 		int r_size_y, r_size_x; // room size
+		int r_center_y, r_center_x;
+		int r_old_center_y, r_old_center_x;
 		int room_num = rand() % 5 + 5;
 		bool collision; // flag for collision of rooms
+		
 		
 		// fill dungeon with walls and borders
 		for (int y = 0; y <= rows; y++)
@@ -35,7 +38,7 @@ int dungeon (int c, int rows, int cols, char (* map)[cols]) // char (* map)[cols
 			}
 		}
 		
-		do
+		while(r_placed < room_num)
 		{
 			int try_counter = 0; // number of tries of prototyping
 			
@@ -93,8 +96,42 @@ int dungeon (int c, int rows, int cols, char (* map)[cols]) // char (* map)[cols
 					}
 				}
 				r_placed++;
+
+				// corridors
+				if (r_placed > 1)
+				{
+					r_old_center_y = r_center_y;
+					r_old_center_x = r_center_x;
+				}
+				
+				r_center_y = ry + (r_size_y / 2);
+				r_center_x = rx + (r_size_x / 2);
+				
+				if (r_placed > 1)
+				{
+					int path_y;
+					
+					for (path_y = r_old_center_y; path_y != r_center_y; )
+					{
+						map[path_y][r_old_center_x] = ' ';
+						
+						if (r_old_center_y < r_center_y)
+							path_y++;
+						else if (r_old_center_y > r_center_y)
+							path_y--;
+					}
+					
+					for (int x = r_old_center_x; x != r_center_x; )
+					{
+						map[path_y][x] = ' ';
+						
+						if (r_old_center_x < r_center_x)
+							x++;
+						else if (r_old_center_x > r_center_x)
+							x--;
+					}
+				}
 		}
-		while(r_placed <= room_num);
     }
 	
 	// draw the dungeon
@@ -169,7 +206,7 @@ int main(void)
 	
     do
     {
-        dungeon(c, rows - 1, cols - 1, map);
+        game_loop(c, rows - 1, cols - 1, map);
 
     }
     while ((c = getch()) != 27); // 27 = Esc
