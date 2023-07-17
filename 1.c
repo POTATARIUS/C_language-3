@@ -3,6 +3,13 @@
 #include <time.h>
 #include <stdbool.h>
 
+#define RED 1
+#define GREEN 2
+#define YELLOW 3
+#define BLUE 4
+#define MAGENTA 5
+#define CYAN 6
+
 int py, px; // @ coords
 bool t_placed = 0; // flag for goblin
 bool p_placed = 0; // flag for player
@@ -14,25 +21,77 @@ struct monsters
 {
 	int y;
 	int x;
-	int hp;
+	int lvl;
+	int type;
 };
 
 struct monsters monster[10]; // 0 ... 9
 
+int dungeon_draw (int rows, int cols, char (* map)[cols])
+{
+	// draw the dungeon
+	for (int y = 0; y <= rows; y++)
+    {
+        for (int x = 0; x <= cols; x++)
+        {
+			if (y == 0 || y == rows)
+				mvaddch(y,x,' ');
+			else if (map[y][x] == '>')
+			{
+				attron(A_BOLD);
+				mvaddch(y,x,'>');
+				attroff(A_BOLD);
+			}
+			else if (map[y][x] == '%')
+				mvaddch(y,x,'%');
+			else if (map[y][x] == ' ')
+				mvaddch(y,x,' ');
+			else if (map[y][x] == '#')
+				mvaddch(y,x,'#');
+			else if (map[y][x] == 't')
+			{
+				for (int m = 0; m < 10; m++)
+				{
+					if (monster[m].y == y && monster[m].x == x) ;
+					{
+						if (monster[m].lvl < dlvl / 2 + 2)
+						{
+							attron(COLOR_PAIR(RED));
+								mvaddch(y,x,monster[m].type);
+							attroff(COLOR_PAIR(RED));
+						}
+					    else if (monster[m].lvl < dlvl + 2)
+						{
+							attron(COLOR_PAIR(YELLOW));
+								mvaddch(y,x,monster[m].type);
+							attroff(COLOR_PAIR(YELLOW));
+						}
+						else
+							mvaddch(y,x,monster[m].type);
+					}
+				}
+			}
+        }
+    }
+	
+	mvprintw(rows, 0, "Gold: %d \t Dlvl: %d", p_gold, dlvl);
+	
+	return 0;
+}
 
 int battle(int cols, char (* map)[cols], int dir_y, int dir_x)
 {
 	for (int m = 0; m < 10; m++)
 	{
-			if (dir_y == monster[m] .y && dir_x == monster[m] .x)
+			if (dir_y == monster[m].y && dir_x == monster[m].x)
 			{
-				if (monster[m] .hp <= 0)
+				if (monster[m] .lvl <= 0)
 				{
 					map[dir_y][dir_x] = ' ';
 					p_gold += rand() % 10 + 1;
 				}
 				else
-					monster[m] .hp -= 1;
+					monster[m].lvl -= 1;
 				break;
 			}
 	}
@@ -51,7 +110,7 @@ int p_action(int c, int cols, char (* map)[cols])
 		dir_x--;
 	else if (c == KEY_RIGHT)
 		dir_x++;
-	else if (c == '>' && map[py][px] == '>')
+	else if (c == '>' || map[py][px] == '>')
 	{
 		t_placed = 0;
 		p_placed = 0;
@@ -69,33 +128,6 @@ int p_action(int c, int cols, char (* map)[cols])
 	return 0;
 }
 
-int dungeon_draw (int rows, int cols, char (* map)[cols])
-{
-	// draw the dungeon
-	for (int y = 0; y <= rows; y++)
-    {
-        for (int x = 0; x <= cols; x++)
-        {
-			if (y == 0 || y == rows)
-				mvaddch(y,x,' ');
-			else if (map[y][x] == 't')
-				mvaddch(y,x,'t');
-			else if (map[y][x] == '>')
-				mvaddch(y,x,'>');
-			else if (map[y][x] == '%')
-				mvaddch(y,x,'%');
-			else if (map[y][x] == ' ')
-				mvaddch(y,x,' ');
-			else
-				mvaddch(y,x,'#');
-        }
-    }
-	
-	mvprintw(rows, 0, "Gold: %d \t Dlvl: %d", p_gold, dlvl);
-	
-	return 0;
-}
-
 int respawn_creatures(int rows, int cols, char (* map)[cols])
 {
 	if (!t_placed) // aka t_placed == 0
@@ -109,12 +141,24 @@ int respawn_creatures(int rows, int cols, char (* map)[cols])
 				my = rand() % rows;
 				mx = rand() % cols;
 			}
-			while (map[my][mx] == '#' || map [my][mx] == '%') ;
+			while (map[my][mx] != ' ');
 			
-			monster[m] .y = my;
-			monster[m] .x = mx;
-			monster[m] .hp = 2;
-			map[monster[m] .y][monster[m] .x] = 't';
+			monster[m].y = my;
+			monster[m].x = mx;
+			
+			monster[m].lvl = rand() % dlvl + 2;
+			
+			if (dlvl == 1 && !(rand() % 5))
+				monster[m].lvl = 1;
+			
+			if (rand() % 3)
+				monster[m].lvl = dlvl + 2;
+			
+			monster[m].type = rand() % dlvl + 97;
+			if (dlvl == 1 && !(rand() % 3))
+				monster[m].type += 1;
+			
+			map[monster[m].y][monster[m].x] = 't';
 		}	
 		
 		t_placed = 1;
@@ -272,10 +316,9 @@ int dungeon_gen (int rows, int cols, char (* map)[cols])
 	return 0;
 }
 
-int game_loop(int rows, int cols, char (* map)[cols]) // char (* map)[cols]) - two-dimensional array ...
+int game_loop(int c, int rows, int cols, char (* map)[cols]) // char (* map)[cols]) - two-dimensional array ...
 {	
-	int c;
-	int new_lvl;
+	bool new_lvl = 0;
 	srand(time(NULL));
 	
 	dungeon_gen(rows, cols, map);
@@ -289,7 +332,9 @@ int game_loop(int rows, int cols, char (* map)[cols]) // char (* map)[cols]) - t
 	
 	dungeon_draw (rows, cols, map);
 	
-    mvaddch(py,px,'@'); // draw p
+    attron(A_BOLD);
+		mvaddch(py,px,'@'); // draw p
+	attroff(A_BOLD);
 	
 	if (new_lvl)
 		mvprintw(0, 0, "Welcome to level %d (Peress any key to continue)", ++dlvl);	
@@ -299,13 +344,22 @@ int game_loop(int rows, int cols, char (* map)[cols]) // char (* map)[cols]) - t
 	return c;
 }
 
-
 int main(void)
 {
     int c = 0; // input
     int rows, cols;	
 
     initscr(); // init curses
+	start_color();
+	use_default_colors();
+	
+	init_pair(RED, COLOR_RED, COLOR_BLACK);
+	init_pair(GREEN, COLOR_GREEN, COLOR_BLACK);
+	init_pair(YELLOW, COLOR_YELLOW, COLOR_BLACK);
+	init_pair(BLUE, COLOR_BLUE, COLOR_BLACK);
+	init_pair(MAGENTA, COLOR_MAGENTA, COLOR_BLACK);
+	init_pair(CYAN, COLOR_CYAN, COLOR_BLACK);
+	
     keypad(stdscr, 1); // allow arrows, F1 - F12
 	
     noecho(); // don't display user input
@@ -318,7 +372,7 @@ int main(void)
 	
     do
     {
-        c = game_loop(rows - 1, cols - 1, map); // rows-1 cause map[][] 0 ... 119
+        c = game_loop(c, rows - 1, cols - 1, map); // rows-1 cause map[][] 0 ... 119
     }
     while (c != 27); // 27 = Esc
 	
