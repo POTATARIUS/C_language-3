@@ -11,6 +11,8 @@
 #define CYAN 6
 
 int py, px; // @ coords
+int att = 1;
+int hp = 510;
 bool t_placed = 0; // flag for goblin
 bool p_placed = 0; // flag for player
 int r_placed = 0; // flag for room
@@ -23,6 +25,7 @@ struct monsters
 	int x;
 	int lvl;
 	int type;
+	bool awake;
 };
 
 struct monsters monster[10]; // 0 ... 9
@@ -39,7 +42,7 @@ int dungeon_draw (int rows, int cols, char (* map)[cols])
 			else if (map[y][x] == '>')
 			{
 				attron(A_BOLD);
-				mvaddch(y,x,'>');
+					mvaddch(y,x,'>');
 				attroff(A_BOLD);
 			}
 			else if (map[y][x] == '%')
@@ -52,7 +55,7 @@ int dungeon_draw (int rows, int cols, char (* map)[cols])
 			{
 				for (int m = 0; m < 10; m++)
 				{
-					if (monster[m].y == y && monster[m].x == x) ;
+					if (monster[m].y == y && monster[m].x == x)
 					{
 						if (monster[m].lvl < dlvl / 2 + 2)
 						{
@@ -74,9 +77,77 @@ int dungeon_draw (int rows, int cols, char (* map)[cols])
         }
     }
 	
-	mvprintw(rows, 0, "Gold: %d \t Dlvl: %d", p_gold, dlvl);
+	mvprintw(rows, 0, "HP: %d \t Att: %d \t Gold: %d \t Dlvl: %d", hp, att, p_gold, dlvl);
 	
 	return 0;
+}
+
+int monster_turn (int rows, int cols, char (* map)[cols])
+{
+	int dist_y, dist_x;
+	
+	for (int m = 0; m < 10; m++) 
+	{	
+		if (monster[m].lvl < 1)
+			continue;
+				
+		dist_y = abs(monster[m].y - py); // 22 - 33 = -11 | 33 - 22 = 11 abs(значение) - убирает знак
+		dist_x = abs(monster[m].x - px);
+		
+		if (dist_y < 5 && dist_x < 5)
+			monster[m].awake = 1;
+		
+		if (monster[m].awake == 0)
+			continue;
+		
+		int dir_y = monster[m].y;
+		int dir_x = monster[m].x;
+		
+		// regular movement 4-side
+		if (dist_y > dist_x) /// if dist y > dist x -> up dist y for close dist with player
+		{
+			if (dir_y < py)
+				dir_y++;
+			else
+				dir_y--;
+		}
+		else
+		{			
+			if (dir_x < px)
+				dir_x++;
+			else
+				dir_x--;
+		}
+
+		//diagonal (to get around corner)
+		if (map[dir_y][dir_x] == '#' || map[dir_y][dir_x] == '%')
+		{
+			dir_y = monster[m].y;
+			dir_x = monster[m].x;
+		
+			if (dir_y < py)
+				dir_y++;
+			else
+				dir_y--;
+			
+			if (dir_x < px)
+				dir_x++;
+			else
+				dir_x--;
+		}
+		
+		if (dist_y < 2 && dist_x < 2)
+		{
+			hp -= dlvl / 2 + 1;
+		}
+		if (map[dir_y][dir_x] == ' ' && (dir_y != py && dir_x != px))
+		{
+			map[monster[m].y][monster[m].x] = ' ';
+			monster[m].y = dir_y;
+			monster[m].x = dir_x;
+			map[monster[m].y][monster[m].x] = 't';
+		}
+	}
 }
 
 int battle(int cols, char (* map)[cols], int dir_y, int dir_x)
@@ -91,7 +162,7 @@ int battle(int cols, char (* map)[cols], int dir_y, int dir_x)
 					p_gold += rand() % 10 + 1;
 				}
 				else
-					monster[m].lvl -= 1;
+					monster[m].lvl -= att;
 				break;
 			}
 	}
@@ -119,7 +190,7 @@ int p_action(int c, int cols, char (* map)[cols])
 	}
 	
 	if (map[dir_y][dir_x] == ' ' || map[dir_y][dir_x] == '>')
-	{
+	{	
 		py = dir_y;
 		px = dir_x;
 	}
@@ -134,7 +205,7 @@ int respawn_creatures(int rows, int cols, char (* map)[cols])
 	{
 		int my, mx;
 		
-		for (int m = 0; m < 10; m++)
+		for (int m = 0; m < 10; m++) 
 		{
 			do
 			{
@@ -151,12 +222,14 @@ int respawn_creatures(int rows, int cols, char (* map)[cols])
 			if (dlvl == 1 && !(rand() % 5))
 				monster[m].lvl = 1;
 			
-			if (rand() % 3)
+			if (rand() % 2)
 				monster[m].lvl = dlvl + 2;
 			
 			monster[m].type = rand() % dlvl + 97;
 			if (dlvl == 1 && !(rand() % 3))
 				monster[m].type += 1;
+			
+			monster[m].awake = 0;
 			
 			map[monster[m].y][monster[m].x] = 't';
 		}	
@@ -330,14 +403,22 @@ int game_loop(int c, int rows, int cols, char (* map)[cols]) // char (* map)[col
 		new_lvl = p_action (c, cols, map); // battle ()
 	}
 	
-	dungeon_draw (rows, cols, map);
+	monster_turn(rows, cols, map);
 	
+	dungeon_draw (rows, cols, map);
+		
     attron(A_BOLD);
 		mvaddch(py,px,'@'); // draw p
 	attroff(A_BOLD);
 	
 	if (new_lvl)
 		mvprintw(0, 0, "Welcome to level %d (Peress any key to continue)", ++dlvl);	
+	
+	if (hp < 1)
+	{
+		clear();
+		mvprintw(rows / 2, cols / 2 - 10, "RIP. You had %d gold.", p_gold);	
+	}
 	
 	c = getch();
 	
