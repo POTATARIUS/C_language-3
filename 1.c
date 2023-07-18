@@ -12,7 +12,7 @@
 
 int py, px; // @ coords
 int att = 1;
-int hp = 510;
+int hp = 10;
 bool t_placed = 0; // flag for goblin
 bool p_placed = 0; // flag for player
 int r_placed = 0; // flag for room
@@ -94,7 +94,7 @@ int monster_turn (int rows, int cols, char (* map)[cols])
 		dist_y = abs(monster[m].y - py); // 22 - 33 = -11 | 33 - 22 = 11 abs(значение) - убирает знак
 		dist_x = abs(monster[m].x - px);
 		
-		if (dist_y < 5 && dist_x < 5)
+		if (dist_y < 3 && dist_x < 3)
 			monster[m].awake = 1;
 		
 		if (monster[m].awake == 0)
@@ -136,11 +136,32 @@ int monster_turn (int rows, int cols, char (* map)[cols])
 				dir_x--;
 		}
 		
+		// movement in case of wall bumping
+		if (map[dir_y][dir_x] == '#' || map[dir_y][dir_x] == '%' ||
+			map[dir_y][dir_x] == '>')
+		{
+			
+			if (dist_y > dist_x) /// if dist y > dist x -> up dist y for close dist with player
+			{
+				if (dir_y > py)
+					dir_y++;
+				else
+					dir_y--;
+			}
+			else
+			{			
+				if (dir_x > px)
+					dir_x++;
+				else
+					dir_x--;
+			}
+		}
+		
 		if (dist_y < 2 && dist_x < 2)
 		{
 			hp -= dlvl / 2 + 1;
 		}
-		if (map[dir_y][dir_x] == ' ' && (dir_y != py && dir_x != px))
+		else if (map[dir_y][dir_x] == ' ')
 		{
 			map[monster[m].y][monster[m].x] = ' ';
 			monster[m].y = dir_y;
